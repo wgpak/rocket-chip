@@ -886,8 +886,8 @@ class RVFIMonitor(implicit p: Parameters) extends BlackBox {
     io.rvfi_rs2_rdata := content.map(_.rs2_rdata).asUInt
     io.rvfi_rd_addr := content.map(_.rd_addr).asUInt
     io.rvfi_rd_wdata := content.map(_.rd_wdata).asUInt
-    io.rvfi_pc_rdata := content.map(_.pc_rdata).asSInt
-    io.rvfi_pc_wdata := content.map(_.pc_wdata).asSInt
+    io.rvfi_pc_rdata := content.map(_.pc_rdata).asUInt.asSInt
+    io.rvfi_pc_wdata := content.map(_.pc_wdata).asUInt.asSInt
     io.rvfi_mem_addr := content.map(_.mem_addr).asUInt
     io.rvfi_mem_rmask := content.map(_.mem_rmask).asUInt
     io.rvfi_mem_wmask := content.map(_.mem_wmask).asUInt
@@ -925,10 +925,10 @@ class RocketWithRVFI(implicit p: Parameters) extends Rocket()(p) {
     }
   }
 
-  inst_commit.pc_rdata := wb_reg_pc
+  inst_commit.pc_rdata := wb_reg_pc.asSInt
   inst_commit.pc_wdata := Mux(wb_xcpt || csr.io.eret, csr.io.evec, 
                           Reg(next=Mux(replay_wb, wb_reg_pc,
-                                                  mem_npc)))
+                                                  mem_npc))).asSInt
   inst_commit.insn := t.insn
   inst_commit.order := UInt(0)
   inst_commit.intr := t.exception
