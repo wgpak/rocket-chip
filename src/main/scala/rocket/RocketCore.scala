@@ -965,7 +965,9 @@ class RocketWithRVFI(implicit p: Parameters) extends Rocket()(p) {
 //  inst_commit.mem_wmask := Fill(p(XLen)/8, Reg(next=Reg(next=io.dmem.req.valid)) && !Reg(next=io.dmem.s1_kill) && !io.dmem.s2_nack && Reg(next=Reg(next=isWrite(io.dmem.req.bits.cmd))))  // TODO Partial store bits (M_PWR)
 
   inst_commit.valid := Bool(false)
-  when (t.valid && !t.exception) {
+// The trace doesn't print out debug info when exception occurs, not sure why
+//  when (t.valid && !t.exception) {
+  when (t.valid) {
     inst_order := inst_order + UInt(1)
     inst_commit.valid := Bool(true)
     inst_commit.order := inst_order
