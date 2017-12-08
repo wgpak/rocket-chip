@@ -795,8 +795,8 @@ object RVFIMonitor {
     val rs2_rdata = UInt(width=xlen)
     val rd_addr = UInt(width=5)
     val rd_wdata = UInt(width=xlen)
-    val pc_rdata = UInt(width=xlen)
-    val pc_wdata = UInt(width=xlen)
+    val pc_rdata = SInt(width=xlen)
+    val pc_wdata = SInt(width=xlen)
     val mem_addr = UInt(width=xlen)
     val mem_rmask = UInt(width=xlen/8)
     val mem_wmask = UInt(width=xlen/8)
@@ -831,8 +831,8 @@ class RVFIMonitor(implicit p: Parameters) extends BlackBox {
     val rvfi_rs2_rdata = UInt(INPUT, width=nret*xlen)
     val rvfi_rd_addr = UInt(INPUT, width=5*nret)
     val rvfi_rd_wdata = UInt(INPUT, width=nret*xlen)
-    val rvfi_pc_rdata = UInt(INPUT, width=nret*xlen)
-    val rvfi_pc_wdata = UInt(INPUT, width=nret*xlen)
+    val rvfi_pc_rdata = SInt(INPUT, width=nret*xlen)
+    val rvfi_pc_wdata = SInt(INPUT, width=nret*xlen)
     val rvfi_mem_addr = UInt(INPUT, width=nret*xlen)
     val rvfi_mem_rmask = UInt(INPUT, width=nret*xlen/8)
     val rvfi_mem_wmask = UInt(INPUT, width=nret*xlen/8)
@@ -854,8 +854,8 @@ class RVFIMonitor(implicit p: Parameters) extends BlackBox {
     io.rvfi_rs2_rdata := content.map(_.rs2_rdata).asUInt
     io.rvfi_rd_addr := content.map(_.rd_addr).asUInt
     io.rvfi_rd_wdata := content.map(_.rd_wdata).asUInt
-    io.rvfi_pc_rdata := content.map(_.pc_rdata).asUInt
-    io.rvfi_pc_wdata := content.map(_.pc_wdata).asUInt
+    io.rvfi_pc_rdata := content.map(_.pc_rdata).asSInt
+    io.rvfi_pc_wdata := content.map(_.pc_wdata).asSInt
     io.rvfi_mem_addr := content.map(_.mem_addr).asUInt
     io.rvfi_mem_rmask := content.map(_.mem_rmask).asUInt
     io.rvfi_mem_wmask := content.map(_.mem_wmask).asUInt
