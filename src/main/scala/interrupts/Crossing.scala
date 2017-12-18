@@ -4,7 +4,7 @@ package freechips.rocketchip.interrupts
 
 import Chisel._
 import freechips.rocketchip.config.Parameters
-import freechips.rocketchip.util.SynchronizerShiftReg
+import freechips.rocketchip.util.{SynchronizerShiftReg, AsyncResetReg}
 import freechips.rocketchip.diplomacy._
 
 @deprecated("IntXing does not ensure interrupt source is glitch free. Use IntSyncSource and IntSyncSink", "rocket-chip 1.2")
@@ -21,7 +21,11 @@ class IntXing(sync: Int = 3)(implicit p: Parameters) extends LazyModule
 
 object IntSyncCrossingSource
 {
-  def apply(alreadyRegistered: Boolean = false)(implicit p: Parameters) = LazyModule(new IntSyncCrossingSource(alreadyRegistered)).node
+  def apply(alreadyRegistered: Boolean = false)(implicit p: Parameters) =
+  {
+    val intsource = LazyModule(new IntSyncCrossingSource(alreadyRegistered))
+    intsource.node
+  }
 }
 
 
@@ -34,7 +38,7 @@ class IntSyncCrossingSource(alreadyRegistered: Boolean = false)(implicit p: Para
       if (alreadyRegistered) {
         out.sync := in
       } else {
-        out.sync := RegNext(in)
+        out.sync := AsyncResetReg(Cat(in.reverse)).toBools
       }
     }
   }
@@ -54,5 +58,9 @@ class IntSyncCrossingSink(sync: Int = 3)(implicit p: Parameters) extends LazyMod
 
 object IntSyncCrossingSink
 {
-  def apply(sync: Int = 3)(implicit p: Parameters) = LazyModule(new IntSyncCrossingSink(sync)).node
+  def apply(sync: Int = 3)(implicit p: Parameters) =
+  {
+    val intsink = LazyModule(new IntSyncCrossingSink(sync))
+    intsink.node
+  }
 }

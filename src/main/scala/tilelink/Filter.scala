@@ -3,7 +3,6 @@
 package freechips.rocketchip.tilelink
 
 import Chisel._
-import chisel3.internal.sourceinfo.SourceInfo
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy._
 import scala.math.{min,max}
@@ -43,7 +42,7 @@ class TLFilter(
         require (m.supportsPutFull.contains(o.supportsPutFull))
         require (m.supportsPutPartial.contains(o.supportsPutPartial))
         require (m.supportsHint.contains(o.supportsHint))
-        require (m.fifoId == o.fifoId) // could relax this, but hard to validate
+        require (!o.fifoId.isDefined || m.fifoId == o.fifoId)
       }
       out
     })})
@@ -92,9 +91,9 @@ object TLFilter
   def apply(
     Mfilter: TLManagerParameters => Option[TLManagerParameters] = TLFilter.Midentity,
     Cfilter: TLClientParameters  => Option[TLClientParameters]  = TLFilter.Cidentity
-    )(x: TLOutwardNode)(implicit p: Parameters, sourceInfo: SourceInfo): TLOutwardNode = {
+    )(implicit p: Parameters): TLNode =
+  {
     val filter = LazyModule(new TLFilter(Mfilter, Cfilter))
-    filter.node := x
     filter.node
   }
 }

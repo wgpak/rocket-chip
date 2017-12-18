@@ -39,7 +39,7 @@ class SystemBus(params: SystemBusParams)(implicit p: Parameters) extends TLBusWr
   def toSplitSlaves: TLOutwardNode = outwardSplitNode
 
   def toPeripheryBus(addBuffers: Int = 0): TLOutwardNode = {
-    TLBuffer.chain(addBuffers).foldRight(pbus_fixer.node:TLOutwardNode)(_ := _)
+    TLBuffer.chain(addBuffers).foldRight(pbus_fixer.node:TLOutwardNode)(_ :*= _)
   }
 
   val toMemoryBus: TLOutwardNode = outwardNode
@@ -53,9 +53,7 @@ class SystemBus(params: SystemBusParams)(implicit p: Parameters) extends TLBusWr
   def fromTile(name: Option[String])(gen: Parameters => TLOutwardNode) {
     this {
       LazyScope(s"${busName}FromTile${name.getOrElse("")}") {
-        SourceCardinality { implicit p =>
-          master_splitter.node :=* gen(p)
-        }
+        master_splitter.node :=* gen(p)
       }
     }
   }
@@ -70,24 +68,6 @@ class SystemBus(params: SystemBusParams)(implicit p: Parameters) extends TLBusWr
   def fromSyncFIFOMaster(params: BufferParams =  BufferParams.default, name: Option[String] = None): TLInwardNode = {
     fromSyncPorts(params, name)
   }
-
-  def fromAsyncPorts(depth: Int = 8, sync: Int = 3, name : Option[String] = None): TLAsyncInwardNode = {
-    val sink = LazyModule(new TLAsyncCrossingSink(depth, sync))
-    name.foreach { n => sink.suggestName(s"${busName}_${n}_TLAsyncCrossingSink") }
-    port_fixer.node :=* sink.node
-    sink.node
-  }
-
-  def fromAsyncFIFOMaster(depth: Int = 8, sync: Int = 3, name: Option[String] = None): TLAsyncInwardNode = fromAsyncPorts(depth, sync, name)
-
-  def fromRationalPorts(dir: RationalDirection, name: Option[String] = None): TLRationalInwardNode = {
-    val sink = LazyModule(new TLRationalCrossingSink(dir))
-    name.foreach{ n => sink.suggestName(s"${busName}_${n}_TLRationalCrossingSink") }
-    port_fixer.node :=* sink.node
-    sink.node
-  }
-
-  def fromRationalFIFOMaster(dir: RationalDirection, name: Option[String] = None): TLRationalInwardNode = fromRationalPorts(dir, name)
 }
 
 /** Provides buses that serve as attachment points,

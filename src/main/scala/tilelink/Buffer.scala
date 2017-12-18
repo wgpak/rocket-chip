@@ -3,7 +3,6 @@
 package freechips.rocketchip.tilelink
 
 import Chisel._
-import chisel3.internal.sourceinfo.SourceInfo
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy._
 import scala.math.{min,max}
@@ -57,18 +56,17 @@ class TLBuffer(
 
 object TLBuffer
 {
-  // applied to the TL source node; y.node := TLBuffer(x.node)
-  def apply()                                   (x: TLOutwardNode)(implicit p: Parameters, sourceInfo: SourceInfo): TLOutwardNode = apply(BufferParams.default)(x)
-  def apply(abcde: BufferParams)                (x: TLOutwardNode)(implicit p: Parameters, sourceInfo: SourceInfo): TLOutwardNode = apply(abcde, abcde)(x)
-  def apply(ace: BufferParams, bd: BufferParams)(x: TLOutwardNode)(implicit p: Parameters, sourceInfo: SourceInfo): TLOutwardNode = apply(ace, bd, ace, bd, ace)(x)
+  def apply()                                   (implicit p: Parameters): TLNode = apply(BufferParams.default)
+  def apply(abcde: BufferParams)                (implicit p: Parameters): TLNode = apply(abcde, abcde)
+  def apply(ace: BufferParams, bd: BufferParams)(implicit p: Parameters): TLNode = apply(ace, bd, ace, bd, ace)
   def apply(
       a: BufferParams,
       b: BufferParams,
       c: BufferParams,
       d: BufferParams,
-      e: BufferParams)(x: TLOutwardNode)(implicit p: Parameters, sourceInfo: SourceInfo): TLOutwardNode = {
+      e: BufferParams)(implicit p: Parameters): TLNode =
+  {
     val buffer = LazyModule(new TLBuffer(a, b, c, d, e))
-    buffer.node :=? x
     buffer.node
   }
 

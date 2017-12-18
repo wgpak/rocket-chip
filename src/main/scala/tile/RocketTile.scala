@@ -23,6 +23,7 @@ case class RocketTileParams(
     hcfOnUncorrectable: Boolean = false,
     name: Option[String] = Some("tile"),
     hartid: Int = 0,
+    blockerCtrlAddr: Option[BigInt] = None,
     boundaryBuffers: Boolean = false // if synthesized with hierarchical PnR, cut feed-throughs?
     ) extends TileParams {
   require(icache.isDefined)
@@ -65,6 +66,9 @@ class RocketTile(val rocketParams: RocketTileParams)(implicit p: Parameters) ext
       val itim = if (frontend.icache.slaveNode.edges.in.isEmpty) Map() else Map(
         "sifive,itim"          -> ofRef(frontend.icache.device))
 
+      val incoherent = if (!rocketParams.core.useAtomicsOnlyForIO) Map() else Map(
+        "sifive,d-cache-incoherent" -> Nil)
+
       val icache = rocketParams.icache.map(i => Map(
         "i-cache-block-size"   -> ofInt(block),
         "i-cache-sets"         -> ofInt(i.nSets),
@@ -103,8 +107,8 @@ class RocketTile(val rocketParams: RocketTileParams)(implicit p: Parameters) ext
         "compatible"           -> Seq(ResourceString("sifive,rocket0"), ResourceString("riscv")),
         "status"               -> ofStr("okay"),
         "clock-frequency"      -> Seq(ResourceInt(rocketParams.core.bootFreqHz)),
-        "riscv,isa"            -> ofStr(isa))
-        ++ dcache ++ icache ++ nextlevel ++ mmu ++ itlb ++ dtlb ++ dtim ++itim)
+        "riscv,isa"            -> ofStr(isa),
+        "timebase-frequency"   -> Seq(ResourceInt(p(DTSTimebase)))) ++ dcache ++ icache ++ nextlevel ++ mmu ++ itlb ++ dtlb ++ dtim ++ itim ++ incoherent)
     }
   }
   val intcDevice = new Device {
@@ -150,6 +154,7 @@ class RocketTileModule(outer: RocketTile) extends BaseTileModule(outer, () => ne
   val uncorrectable = RegInit(Bool(false))
 
   decodeCoreInterrupts(core.io.interrupts) // Decode the interrupt vector
+  outer.busErrorUnit.foreach { beu => core.io.interrupts.buserror.get := beu.module.io.interrupt }
   core.io.hartid := io.hartid // Pass through the hartid
   io.trace.foreach { _ := core.io.trace }
   io.halt_and_catch_fire.foreach { _ := uncorrectable }

@@ -7,9 +7,7 @@ import freechips.rocketchip.diplomacy._
 
 package object interrupts
 {
-  type IntInwardNode = InwardNodeHandle[IntSourcePortParameters, IntSinkPortParameters, Vec[Bool]]
-  type IntOutwardNode = OutwardNodeHandle[IntSourcePortParameters, IntSinkPortParameters, Vec[Bool]]
-  type IntNode = NodeHandle[IntSourcePortParameters, IntSinkPortParameters, Vec[Bool], IntSourcePortParameters, IntSinkPortParameters, Vec[Bool]]
-  type IntSyncInwardNode = InwardNodeHandle[IntSourcePortParameters, IntSinkPortParameters, SyncInterrupts]
-  type IntSyncOutwardNode = OutwardNodeHandle[IntSourcePortParameters, IntSinkPortParameters, SyncInterrupts]
+  type IntInwardNode = InwardNodeHandle[IntSourcePortParameters, IntSinkPortParameters, IntEdge, Vec[Bool]]
+  type IntOutwardNode = OutwardNodeHandle[IntSourcePortParameters, IntSinkPortParameters, IntEdge, Vec[Bool]]
+  type IntNode = SimpleNodeHandle[IntSourcePortParameters, IntSinkPortParameters, IntEdge, Vec[Bool]]
 }

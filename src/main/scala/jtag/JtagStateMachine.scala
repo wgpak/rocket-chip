@@ -78,7 +78,8 @@ class JtagStateMachine(implicit val p: Parameters) extends Module() {
   }
   val io = IO(new StateMachineIO)
 
-  val nextState = Wire(JtagState.State.chiselType)
+  val nextState = WireInit(JtagState.State.chiselType(), DontCare)
+
   val currStateReg = Module (new AsyncResetRegVec(w = JtagState.State.width,
     init = JtagState.State.toInt(JtagState.TestLogicReset)))
   currStateReg.io.en := true.B

@@ -81,6 +81,21 @@ class TLRAM(
   }
 }
 
+object TLRAM
+{
+  def apply(
+    address: AddressSet,
+    cacheable: Boolean = true,
+    executable: Boolean = true,
+    beatBytes: Int = 4,
+    devName: Option[String] = None,
+    errors: Seq[AddressSet] = Nil)(implicit p: Parameters): TLInwardNode =
+  {
+    val ram = LazyModule(new TLRAM(address, cacheable, executable, beatBytes, devName, errors))
+    ram.node
+  }
+}
+
 /** Synthesizeable unit testing */
 import freechips.rocketchip.unittest._
 
@@ -89,8 +104,7 @@ class TLRAMSimple(ramBeatBytes: Int, txns: Int)(implicit p: Parameters) extends 
   val model = LazyModule(new TLRAMModel("SRAMSimple"))
   val ram  = LazyModule(new TLRAM(AddressSet(0x0, 0x3ff), beatBytes = ramBeatBytes))
 
-  model.node := fuzz.node
-  ram.node := TLDelayer(0.25)(model.node)
+  ram.node := TLDelayer(0.25) := model.node := fuzz.node
 
   lazy val module = new LazyModuleImp(this) with UnitTestModule {
     io.finished := fuzz.module.io.finished
@@ -98,5 +112,6 @@ class TLRAMSimple(ramBeatBytes: Int, txns: Int)(implicit p: Parameters) extends 
 }
 
 class TLRAMSimpleTest(ramBeatBytes: Int, txns: Int = 5000, timeout: Int = 500000)(implicit p: Parameters) extends UnitTest(timeout) {
-  io.finished := Module(LazyModule(new TLRAMSimple(ramBeatBytes, txns)).module).io.finished
+  val dut = Module(LazyModule(new TLRAMSimple(ramBeatBytes, txns)).module)
+  io.finished := dut.io.finished
 }

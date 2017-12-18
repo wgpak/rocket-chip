@@ -2,6 +2,8 @@
 
 package freechips.rocketchip.jtag
 
+import scala.collection.SortedMap
+
 import chisel3._
 import chisel3.util._
 import chisel3.experimental.withReset
@@ -115,6 +117,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt)(implicit val 
     nextActiveInstruction := irChain.io.update.bits
     updateInstruction := true.B
   } .otherwise {
+    nextActiveInstruction := DontCare
     updateInstruction := false.B
   }
   io.output.instruction := activeInstruction
@@ -139,6 +142,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt)(implicit val 
     tdo := irChain.io.chainOut.data
     tdo_driven := true.B
   } .otherwise {
+    tdo := DontCare
     tdo_driven := false.B
   }
 }
@@ -209,9 +213,12 @@ object JtagTapGenerator {
     bypassChain.io.chainIn := controllerInternal.io.dataChainOut  // for simplicity, doesn't visibly affect anything else
     require(allInstructions.size > 0, "Seriously? JTAG TAP with no instructions?")
 
-    val chainToIcode = allInstructions groupBy { case (icode, chain) => chain } map {
+    // Need to ensure that this mapping is ordered to produce deterministic verilog,
+    // and neither Map nor groupBy are deterministic.
+    // Therefore, we first sort by IDCODE, then sort the groups by the first IDCODE in each group.
+    val chainToIcode = (SortedMap(allInstructions.toList:_*).groupBy { case (icode, chain) => chain } map {
       case (chain, icodeToChain) => chain -> icodeToChain.keys
-    }
+    }).toList.sortBy(_._2.head)
 
     val chainToSelect = chainToIcode map {
       case (chain, icodes) => {
