@@ -45,11 +45,11 @@ class ICacheErrors(implicit p: Parameters) extends CoreBundle()(p)
   val uncorrectable = (cacheParams.itimAddr.nonEmpty && cacheParams.dataECC.canDetect).option(Valid(UInt(width = paddrBits)))
 }
 
-class ICache(val icacheParams: ICacheParams, val hartid: Int)(implicit p: Parameters) extends LazyModule {
+class ICache(val icacheParams: ICacheParams, val hartId: Int)(implicit p: Parameters) extends LazyModule {
   lazy val module = new ICacheModule(this)
   val masterNode = TLClientNode(Seq(TLClientPortParameters(Seq(TLClientParameters(
     sourceId = IdRange(0, 1 + icacheParams.prefetch.toInt), // 0=refill, 1=hint
-    name = s"Core ${hartid} ICache")))))
+    name = s"Core ${hartId} ICache")))))
 
   val size = icacheParams.nSets * icacheParams.nWays * icacheParams.blockBytes
   val device = new SimpleDevice("itim", Seq("sifive,itim0"))
@@ -100,7 +100,7 @@ class ICacheBundle(outer: ICache) extends CoreBundle()(outer.p) {
 // get a tile-specific property without breaking deduplication
 object GetPropertyByHartId {
   def apply[T <: Data](tiles: Seq[RocketTileParams], f: RocketTileParams => Option[T], hartId: UInt): T = {
-    PriorityMux(tiles.collect { case t if f(t).isDefined => (t.hartid === hartId) -> f(t).get })
+    PriorityMux(tiles.collect { case t if f(t).isDefined => (t.hartId === hartId) -> f(t).get })
   }
 }
 
@@ -180,6 +180,8 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
   when (refill_done) {
     val enc_tag = tECC.encode(Cat(tl_out.d.bits.error, refill_tag))
     tag_array.write(refill_idx, Vec.fill(nWays)(enc_tag), Seq.tabulate(nWays)(repl_way === _))
+
+    ccover(tl_out.d.bits.error, "D_ERROR", "I$ D-channel error")
   }
 
   val vb_array = Reg(init=Bits(0, nSets*nWays))
@@ -241,6 +243,24 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
     }
   }
 
+  val s1_clk_en = s1_valid || s1_slaveValid
+  val s2_tag_hit = RegEnable(s1_tag_hit, s1_clk_en)
+  val s2_hit_way = OHToUInt(s2_tag_hit)
+  val s2_scratchpad_word_addr = Cat(s2_hit_way, Mux(s2_slaveValid, s1s3_slaveAddr, io.s2_vaddr)(untagBits-1, log2Ceil(wordBits/8)), UInt(0, log2Ceil(wordBits/8)))
+  val s2_dout = RegEnable(s1_dout, s1_clk_en)
+  val s2_way_mux = Mux1H(s2_tag_hit, s2_dout)
+
+  val s2_tag_disparity = RegEnable(s1_tag_disparity, s1_clk_en).asUInt.orR
+  val s2_tl_error = RegEnable(s1_tl_error.asUInt.orR, s1_clk_en)
+  val s2_data_decoded = dECC.decode(s2_way_mux)
+  val s2_disparity = s2_tag_disparity || s2_data_decoded.error
+  val s2_full_word_write = Wire(init = false.B)
+
+  val s1_scratchpad_hit = Mux(s1_slaveValid, lineInScratchpad(scratchpadLine(s1s3_slaveAddr)), addrInScratchpad(io.s1_paddr))
+  val s2_scratchpad_hit = RegEnable(s1_scratchpad_hit, s1_clk_en)
+  val s2_report_uncorrectable_error = s2_scratchpad_hit && s2_data_decoded.uncorrectable && (s2_valid || (s2_slaveValid && !s2_full_word_write))
+  val s2_error_addr = scratchpadBase.map(base => Mux(s2_scratchpad_hit, base + s2_scratchpad_word_addr, 0.U)).getOrElse(0.U)
+
   // output signals
   outer.icacheParams.latency match {
     case 1 =>
@@ -252,18 +272,7 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
       io.resp.valid := s1_valid && s1_hit
 
     case 2 =>
-      val s1_clk_en = s1_valid || s1_slaveValid
-      val s2_tag_hit = RegEnable(s1_tag_hit, s1_clk_en)
-      val s2_hit_way = OHToUInt(s2_tag_hit)
-      val s2_scratchpad_word_addr = Cat(s2_hit_way, Mux(s2_slaveValid, s1s3_slaveAddr, io.s2_vaddr)(untagBits-1, log2Ceil(wordBits/8)), UInt(0, log2Ceil(wordBits/8)))
-      val s2_dout = RegEnable(s1_dout, s1_clk_en)
-      val s2_way_mux = Mux1H(s2_tag_hit, s2_dout)
-
-      val s2_tag_disparity = RegEnable(s1_tag_disparity, s1_clk_en).asUInt.orR
-      val s2_tl_error = RegEnable(s1_tl_error.asUInt.orR, s1_clk_en)
-      val s2_data_decoded = dECC.decode(s2_way_mux)
-      val s2_disparity = s2_tag_disparity || s2_data_decoded.error
-      val s2_full_word_write = Wire(init = false.B)
+      // when some sort of memory bit error have occurred
       when (s2_valid && s2_disparity) { invalidate := true }
 
       io.resp.bits.data := s2_data_decoded.uncorrected
@@ -271,10 +280,6 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
       io.resp.bits.replay := s2_disparity
       io.resp.valid := s2_valid && s2_hit
 
-      val s1_scratchpad_hit = Mux(s1_slaveValid, lineInScratchpad(scratchpadLine(s1s3_slaveAddr)), addrInScratchpad(io.s1_paddr))
-      val s2_scratchpad_hit = RegEnable(s1_scratchpad_hit, s1_clk_en)
-      val s2_report_uncorrectable_error = s2_scratchpad_hit && s2_data_decoded.uncorrectable && (s2_valid || (s2_slaveValid && !s2_full_word_write))
-      val s2_error_addr = scratchpadBase.map(base => Mux(s2_scratchpad_hit, base + s2_scratchpad_word_addr, 0.U)).getOrElse(0.U)
       io.errors.correctable.foreach { c =>
         c.valid := (s2_valid || s2_slaveValid) && s2_disparity && !s2_report_uncorrectable_error
         c.bits := s2_error_addr
@@ -404,4 +409,34 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
 
   def ccover(cond: Bool, label: String, desc: String)(implicit sourceInfo: SourceInfo) =
     cover(cond, s"ICACHE_$label", "MemorySystem;;" + desc)
+
+  val mem_active_valid = Seq(CoverBoolean(s2_valid, Seq("mem_active")))
+  val data_error = Seq(
+    CoverBoolean(!s2_data_decoded.correctable && !s2_data_decoded.uncorrectable, Seq("no_data_error")),
+    CoverBoolean(s2_data_decoded.correctable, Seq("data_correctable_error")),
+    CoverBoolean(s2_data_decoded.uncorrectable, Seq("data_uncorrectable_error")))
+  val request_source = Seq(
+    CoverBoolean(!s2_slaveValid, Seq("from_CPU")),
+    CoverBoolean(s2_slaveValid, Seq("from_TL"))
+  )
+  val tag_error = Seq(
+    CoverBoolean(!s2_tag_disparity, Seq("no_tag_error")),
+    CoverBoolean(s2_tag_disparity, Seq("tag_error"))
+  )
+  val mem_mode = Seq(
+    CoverBoolean(s2_scratchpad_hit, Seq("ITIM_mode")),
+    CoverBoolean(!s2_scratchpad_hit, Seq("cache_mode"))
+  )
+
+  val error_cross_covers = new CrossProperty(
+    Seq(mem_active_valid, data_error, tag_error, request_source, mem_mode),
+    Seq(
+      // tag error cannot occur in ITIM mode
+      Seq("tag_error", "ITIM_mode"),
+      // Can only respond to TL in ITIM mode
+      Seq("from_TL", "cache_mode")
+    ),
+    "MemorySystem;;Memory Bit Flip Cross Covers")
+
+  cover(error_cross_covers)
 }
