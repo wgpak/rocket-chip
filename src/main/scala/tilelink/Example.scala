@@ -28,7 +28,7 @@ trait ExampleModule extends HasRegMap
 
   regmap(
     0 -> Seq(
-      RegField(params.num, state)),
+      RegField(params.num, state, Some(RegFieldDescription("state", "State: Example of a R/W Register with description.", resetType = RegFieldResetType.S)))),
     4 -> Seq(
       RegField.w1ToClear(4, pending, state)))
 }

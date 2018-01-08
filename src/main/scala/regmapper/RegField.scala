@@ -169,4 +169,4 @@ trait HasRegMap
   val interrupts: Vec[Bool]
 }
 
-// See GPIO.scala for an example of how to use regmap
+// See Example.scala for an example of how to use regmap
