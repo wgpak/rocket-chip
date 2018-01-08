@@ -7,6 +7,37 @@ import chisel3.util.{ReadyValidIO}
 
 import freechips.rocketchip.util.{SimpleRegIO}
 
+
+// This information is not used internally by the regmap(...) function.
+// However, the author of a RegField may be the best person to provide this
+// information which is likely to be needed by downstream SW and Documentation
+// tools.
+
+object RegFieldAccessType extends scala.Enumeration {
+  type RegFieldAccessType = Value
+  val R, W, RW, Other = Value //TODO: Look up what is actually supported by e.g. IP-XACT
+}
+import RegFieldAccessType._
+
+
+object RegFieldResetType extends scala.Enumeration {
+  type RegFieldResetType = Value
+  val Sync, Async, None = Value
+}
+import RegFieldResetType._
+
+case class RegFieldDescription (
+  displayName: String,
+  description: String,
+  overrideHeaderName: String = "",
+  accessType: RegFieldAccessType = RegFieldAccessType.RW,
+  resetType: RegFieldResetType = RegFieldResetType.None,
+  resetValue: Int = 0,
+  enumerations: Map[String, BigInt] = Map()
+){
+  def headerName = if (overrideHeaderName.isEmpty) displayName else overrideHeaderName
+}
+
 case class RegReadFn private(combinational: Boolean, fn: (Bool, Bool) => (Bool, Bool, UInt))
 object RegReadFn
 {
