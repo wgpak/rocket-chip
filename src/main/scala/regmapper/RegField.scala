@@ -22,7 +22,7 @@ import RegFieldAccessType._
 
 object RegFieldResetType extends scala.Enumeration {
   type RegFieldResetType = Value
-  val S, A, N = Value
+  val S, A, N = Value // Sync, Async, or Not Reset
 }
 import RegFieldResetType._
 
@@ -120,14 +120,15 @@ object RegField
   def apply(n: Int, r: RegReadFn, w: RegWriteFn)                                : RegField = apply(n, r,  w,  None)
   def apply(n: Int, rw: UInt)                                                   : RegField = apply(n, rw, rw, None)
   def apply(n: Int, rw: UInt,  description: Option[RegFieldDescription])        : RegField = apply(n, rw, rw, description)
-  def r(n: Int, r: RegReadFn,  description: Option[RegFieldDescription] = None) : RegField = apply(n, r,  (), description)
-  def w(n: Int, w: RegWriteFn, description: Option[RegFieldDescription] = None) : RegField = apply(n, (), w,  description)
+  def r(n: Int, r: RegReadFn,  description: Option[RegFieldDescription] = None) : RegField = apply(n, r,  (), description.map{_.copy(accessType = RegFieldAccessType.R)})
+  def w(n: Int, w: RegWriteFn, description: Option[RegFieldDescription] = None) : RegField = apply(n, (), w,  description.map{_.copy(accessType = RegFieldAccessType.W)})
 
   // This RegField allows 'set' to set bits in 'reg'.
   // and to clear bits when the bus writes bits of value 1.
   // Setting takes priority over clearing.
   def w1ToClear(n: Int, reg: UInt, set: UInt, description: Option[RegFieldDescription] = None): RegField =
-    RegField(n, reg, RegWriteFn((valid, data) => { reg := ~(~reg | Mux(valid, data, UInt(0))) | set; Bool(true) }), description)
+    RegField(n, reg, RegWriteFn((valid, data) => { reg := ~(~reg | Mux(valid, data, UInt(0))) | set; Bool(true) }),
+      description.map{_.copy(accessType=RegFieldAccessType.RWSPECIAL)})
 
   // This RegField wraps an explicit register
   // (e.g. Black-Boxed Register) to create a R/W register.
