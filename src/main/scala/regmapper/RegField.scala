@@ -15,14 +15,14 @@ import freechips.rocketchip.util.{SimpleRegIO}
 
 object RegFieldAccessType extends scala.Enumeration {
   type RegFieldAccessType = Value
-  val R, W, RW, Other = Value //TODO: Look up what is actually supported by e.g. IP-XACT
+  val R, W, RW, RSPECIAL, WSPECIAL, RWSPECIAL, OTHER = Value
 }
 import RegFieldAccessType._
 
 
 object RegFieldResetType extends scala.Enumeration {
   type RegFieldResetType = Value
-  val Sync, Async, None = Value
+  val S, A, N = Value
 }
 import RegFieldResetType._
 
@@ -31,7 +31,7 @@ case class RegFieldDescription (
   description: String,
   overrideHeaderName: String = "",
   accessType: RegFieldAccessType = RegFieldAccessType.RW,
-  resetType: RegFieldResetType = RegFieldResetType.None,
+  resetType: RegFieldResetType = RegFieldResetType.N,
   resetValue: Int = 0,
   enumerations: Map[String, BigInt] = Map()
 ){
@@ -104,7 +104,7 @@ object RegWriteFn
   implicit def apply(x: Unit): RegWriteFn = RegWriteFn((valid, data) => { Bool(true) })
 }
 
-case class RegField(width: Int, read: RegReadFn, write: RegWriteFn, name: String, description: String)
+case class RegField(width: Int, read: RegReadFn, write: RegWriteFn, description: Option[RegFieldDescription])
 {
   require (width > 0, s"RegField width must be > 0, not $width")
   def pipelined = !read.combinational || !write.combinational
@@ -116,27 +116,27 @@ object RegField
   // Byte address => sequence of bitfields, lowest index => lowest address
   type Map = (Int, Seq[RegField])
 
-  def apply(n: Int)                                                         : RegField = apply(n, (), (), "", "")
-  def apply(n: Int, r: RegReadFn, w: RegWriteFn)                            : RegField = apply(n, r, w,   "", "")
-  def apply(n: Int, rw: UInt)                                               : RegField = apply(n, rw, rw, "", "")
-  def apply(n: Int, rw: UInt, name: String, description: String)            : RegField = apply(n, rw, rw, name, description)
-  def r(n: Int, r: RegReadFn,  name: String = "", description: String = "") : RegField = apply(n, r,  (), name, description)
-  def w(n: Int, w: RegWriteFn, name: String = "", description: String = "") : RegField = apply(n, (), w,  name, description)
+  def apply(n: Int)                                                             : RegField = apply(n, (), (), None)
+  def apply(n: Int, r: RegReadFn, w: RegWriteFn)                                : RegField = apply(n, r,  w,  None)
+  def apply(n: Int, rw: UInt)                                                   : RegField = apply(n, rw, rw, None)
+  def apply(n: Int, rw: UInt,  description: Option[RegFieldDescription])        : RegField = apply(n, rw, rw, description)
+  def r(n: Int, r: RegReadFn,  description: Option[RegFieldDescription] = None) : RegField = apply(n, r,  (), description)
+  def w(n: Int, w: RegWriteFn, description: Option[RegFieldDescription] = None) : RegField = apply(n, (), w,  description)
 
   // This RegField allows 'set' to set bits in 'reg'.
   // and to clear bits when the bus writes bits of value 1.
   // Setting takes priority over clearing.
-  def w1ToClear(n: Int, reg: UInt, set: UInt): RegField =
-    RegField(n, reg, RegWriteFn((valid, data) => { reg := ~(~reg | Mux(valid, data, UInt(0))) | set; Bool(true) }))
+  def w1ToClear(n: Int, reg: UInt, set: UInt, description: Option[RegFieldDescription] = None): RegField =
+    RegField(n, reg, RegWriteFn((valid, data) => { reg := ~(~reg | Mux(valid, data, UInt(0))) | set; Bool(true) }), description)
 
   // This RegField wraps an explicit register
   // (e.g. Black-Boxed Register) to create a R/W register.
-  def rwReg(n: Int, bb: SimpleRegIO, name: String = "", description: String = "") : RegField =
+  def rwReg(n: Int, bb: SimpleRegIO, description: Option[RegFieldDescription] = None) : RegField =
     RegField(n, bb.q, RegWriteFn((valid, data) => {
       bb.en := valid
       bb.d := data
       Bool(true)
-    }), name, description)
+    }), description)
 
   // Create byte-sized read-write RegFields out of a large UInt register.
   // It is updated when any of the bytes are written. Because the RegFields
