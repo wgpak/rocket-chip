@@ -81,7 +81,7 @@ class DefaultConfigWithRVFIMonitors extends Config(
   new WithNMemoryChannels(0) ++
   new With1TinyCore ++
 //  new WithNSmallCores(1) ++
-  new BaseConfig()).alter((site, here, up) => {
-    case freechips.rocketchip.tile.XLen => 64
-  })
+  new BaseConfig())//.alter((site, here, up) => {
+//    case freechips.rocketchip.tile.XLen => 64
+//  })
 )
