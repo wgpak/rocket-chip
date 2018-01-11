@@ -843,7 +843,7 @@ object RVFIMonitor {
 
 class RVFIMonitor(implicit p: Parameters) extends BlackBox {
   val xlen = p(XLen)
-  val nret = 3
+  val nret = 2
 
   val io = IO(new Bundle {
     val clock = Clock(INPUT)
@@ -903,8 +903,6 @@ class RocketWithRVFI(implicit p: Parameters) extends Rocket()(p) {
 
   val rd_store_commit = Reg(init=Vec(Seq.fill(32)(RVFIMonitor.invalid_RVFI_base(p(XLen)))))
   val inst_commit = Wire(new RVFIMonitor.RVFI_Base(p(XLen))).suggestName("inst_commit")
-  val illegal_inst_commit = Reg(init=RVFIMonitor.invalid_RVFI_base(p(XLen))).suggestName("illegal_inst_commit")
-  val illegal_inst_commit_filtered = Wire(new RVFIMonitor.RVFI_Base(p(XLen))).suggestName("illegal_inst_commit_filtered")
 
   val t = csr.io.trace(0)
   val rd = RegNext(RegNext(RegNext(id_waddr)))
@@ -931,8 +929,10 @@ class RocketWithRVFI(implicit p: Parameters) extends Rocket()(p) {
                                                   mem_npc))).asSInt
   inst_commit.insn := t.insn
   inst_commit.order := UInt(0)
-  inst_commit.intr := t.exception
-  inst_commit.trap := Reg(next=Reg(next=Reg(next=(id_illegal_insn))))
+  // Interrupt should be raised on the first instruction of the interrupt handler
+  inst_commit.intr := UInt(0)
+  // Trap occurs on an instruction fault
+  inst_commit.trap := t.exception
   inst_commit.halt := UInt(0)
   inst_commit.rs1_addr := Mux(Reg(next=Reg(next=ex_ctrl.rxs1)), wb_reg_inst(19,15), UInt(0))
   inst_commit.rs2_addr := Mux(Reg(next=Reg(next=ex_ctrl.rxs2)), wb_reg_inst(24,20), UInt(0))
@@ -962,13 +962,11 @@ class RocketWithRVFI(implicit p: Parameters) extends Rocket()(p) {
   } .otherwise {
     inst_commit.mem_wmask := UInt(0)
   }
-//  inst_commit.mem_wmask := Fill(p(XLen)/8, Reg(next=Reg(next=io.dmem.req.valid)) && !Reg(next=io.dmem.s1_kill) && !io.dmem.s2_nack && Reg(next=Reg(next=isWrite(io.dmem.req.bits.cmd))))  // TODO Partial store bits (M_PWR)
 
   inst_commit.valid := Bool(false)
 
-  when (t.valid && !t.exception ||
-  // but also make valid if illegal instruction occurred
-        t.valid && inst_commit.trap.toBool) {
+  t.exception
+  when (t.valid) {
 
     inst_order := inst_order + UInt(1)
     inst_commit.valid := Bool(true)
@@ -999,19 +997,6 @@ class RocketWithRVFI(implicit p: Parameters) extends Rocket()(p) {
     rd_store_commit(wb_waddr) := inst_commit
     inst_commit_filtered.valid := Bool(false)
   }
-  when(inst_commit.valid.toBool) {
-    when(inst_commit.trap.toBool) {
-      illegal_inst_commit := inst_commit
-      inst_commit_filtered.valid := Bool(false)
-    } .otherwise {
-      illegal_inst_commit := RVFIMonitor.invalid_RVFI_base(p(XLen))
-    }
-  }
-//  rd_store_commit.zipWithIndex.foreach ({case (rd_store_reg, idx) => {
-//    when(wb_set_sboard && wb_wen && idx.U===wb_waddr) {
-//      rd_store_reg := inst_commit
-//    }
-//  }})
 
 // TODO ll_wen will actually get activate twice if cache miss
 //   so will have to disable first activation if scoreboard
@@ -1033,20 +1018,5 @@ class RocketWithRVFI(implicit p: Parameters) extends Rocket()(p) {
     store_commit := RVFIMonitor.invalid_RVFI_base(p(XLen))
   }
 
-// TODO
-// Add third channel to "retire" interrupted instructions (illegal
-//   instructions).  Wait until the next retired instruction, then
-//   on this channel, output the illegal instructions
-// Forgot why we can't just us the first channel
-  when(inst_commit_filtered.valid.toBool) {
-    illegal_inst_commit_filtered := illegal_inst_commit
-  } .otherwise {
-    illegal_inst_commit_filtered := RVFIMonitor.invalid_RVFI_base(p(XLen))
-  }
-//  when (t.valid && !t.exception ||
-  // but also make valid if illegal instruction occurred
-//        t.valid && inst_commit.trap) {
-// to the main commit channel above?
-
-  rvfi_mon.connect(Vec(Seq(inst_commit_filtered, store_commit, illegal_inst_commit_filtered)))
+  rvfi_mon.connect(Vec(Seq(inst_commit_filtered, store_commit)))
 }
