@@ -16,7 +16,7 @@ import java.nio.file.{Files, Paths}
 case class BootROMParams(
   address: BigInt = 0x10000,
   size: Int = 0x10000,
-  hang: BigInt = 0x10040,
+  hang: BigInt = 0x10000,
   contentFileName: String)
 case object BootROMParams extends Field[BootROMParams]
 

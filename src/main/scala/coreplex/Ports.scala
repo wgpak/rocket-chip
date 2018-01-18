@@ -19,6 +19,7 @@ case class MasterPortParams(
   executable: Boolean = true)
 case object ExtMem extends Field[MasterPortParams]
 case object ExtBus extends Field[MasterPortParams]
+case object ExtBus2 extends Field[MasterPortParams]
 
 /** Specifies the width of external slave ports */
 case class SlavePortParams(beatBytes: Int, idBits: Int, sourceBits: Int)
@@ -119,6 +120,45 @@ trait HasMasterAXI4MMIOPortModuleImp extends LazyModuleImp with HasMasterAXI4MMI
   (mmio_axi4 zip outer.mmio_axi4.in) foreach { case (i, (o, _)) => i <> o }
 }
 
+/** Adds a AXI4 port to the system intended to master an MMIO device bus */
+trait HasMasterAXI4MMIOPort2 extends HasSystemBus {
+  private val params = p(ExtBus2)
+  private val device = new SimpleBus("mmio2", Nil)
+  val mmio2_axi4 = AXI4SlaveNode(Seq(AXI4SlavePortParameters(
+    slaves = Seq(AXI4SlaveParameters(
+      address       = AddressSet.misaligned(params.base, params.size),
+      resources     = device.ranges,
+      executable    = false,
+      supportsWrite = TransferSizes(1, params.maxXferBytes),
+      supportsRead  = TransferSizes(1, params.maxXferBytes))),
+    beatBytes = params.beatBytes)))
+
+  (mmio2_axi4
+    := AXI4Buffer()
+    := AXI4UserYanker()
+    := AXI4Deinterleaver(sbus.blockBytes)
+    := AXI4IdIndexer(params.idBits)
+    := TLToAXI4()
+    := sbus.toFixedWidthPorts)
+}
+
+/** Common io name and methods for propagating or tying off the port bundle */
+trait HasMasterAXI4MMIOPort2Bundle {
+  implicit val p: Parameters
+  val mmio2_axi4: HeterogeneousBag[AXI4Bundle]
+  def connectSimAXIMMIO2(dummy: Int = 1) {
+    val mmio_mem = LazyModule(new SimAXIMem(1, 4096))
+    Module(mmio_mem.module).io.axi4 <> mmio2_axi4
+  }
+}
+
+/** Actually generates the corresponding IO in the concrete Module */
+trait HasMasterAXI4MMIOPort2ModuleImp extends LazyModuleImp with HasMasterAXI4MMIOPort2Bundle {
+  val outer: HasMasterAXI4MMIOPort2
+  val mmio2_axi4 = IO(HeterogeneousBag.fromNode(outer.mmio2_axi4.in))
+  (mmio2_axi4 zip outer.mmio2_axi4.in) foreach { case (i, (o, _)) => i <> o }
+}
+
 /** Adds an AXI4 port to the system intended to be a slave on an MMIO device bus */
 trait HasSlaveAXI4Port extends HasSystemBus {
   private val params = p(ExtIn)
@@ -194,6 +234,45 @@ trait HasMasterTLMMIOPortBundle {
 /** Actually generates the corresponding IO in the concrete Module */
 trait HasMasterTLMMIOPortModuleImp extends LazyModuleImp with HasMasterTLMMIOPortBundle {
   val outer: HasMasterTLMMIOPort
+  val mmio_tl = IO(HeterogeneousBag.fromNode(outer.mmio_tl.in))
+  (mmio_tl zip outer.mmio_tl.in) foreach { case (i, (o, _)) => i <> o }
+}
+
+/** Adds a TileLink port to the system intended to master an MMIO device bus */
+trait HasMasterTLMMIOPort2 extends HasSystemBus {
+  private val params = p(ExtBus2)
+  private val device = new SimpleBus("mmio2", Nil)
+  val mmio_tl = TLManagerNode(Seq(TLManagerPortParameters(
+    managers = Seq(TLManagerParameters(
+      address            = AddressSet.misaligned(params.base, params.size),
+      resources          = device.ranges,
+      executable         = false,
+      supportsGet        = TransferSizes(1, sbus.blockBytes),
+      supportsPutFull    = TransferSizes(1, sbus.blockBytes),
+      supportsPutPartial = TransferSizes(1, sbus.blockBytes))),
+    beatBytes = 4)))
+
+  mmio_tl := TLBuffer() := TLSourceShrinker(1 << params.idBits) := sbus.toFixedWidthPorts
+}
+
+/** Common io name and methods for propagating or tying off the port bundle */
+trait HasMasterTLMMIOPort2Bundle {
+  implicit val p: Parameters
+  val mmio_tl: HeterogeneousBag[TLBundle]
+  def tieOffTLMMIO2(dummy: Int = 1) {
+    mmio_tl.foreach { tl =>
+      tl.a.ready := Bool(true)
+      tl.b.valid := Bool(false)
+      tl.c.ready := Bool(true)
+      tl.d.valid := Bool(false)
+      tl.e.ready := Bool(true)
+    }
+  }
+}
+
+/** Actually generates the corresponding IO in the concrete Module */
+trait HasMasterTLMMIOPort2ModuleImp extends LazyModuleImp with HasMasterTLMMIOPort2Bundle {
+  val outer: HasMasterTLMMIOPort2
   val mmio_tl = IO(HeterogeneousBag.fromNode(outer.mmio_tl.in))
   (mmio_tl zip outer.mmio_tl.in) foreach { case (i, (o, _)) => i <> o }
 }

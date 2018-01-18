@@ -13,6 +13,7 @@ class ExampleRocketSystem(implicit p: Parameters) extends RocketCoreplex
     with HasAsyncExtInterrupts
     with HasMasterAXI4MemPort
     with HasMasterAXI4MMIOPort
+    with HasMasterAXI4MMIOPort2
     with HasSlaveAXI4Port
     with HasPeripheryBootROM
     with HasSystemErrorSlave {
@@ -24,6 +25,7 @@ class ExampleRocketSystemModule[+L <: ExampleRocketSystem](_outer: L) extends Ro
     with HasExtInterruptsModuleImp
     with HasMasterAXI4MemPortModuleImp
     with HasMasterAXI4MMIOPortModuleImp
+    with HasMasterAXI4MMIOPort2ModuleImp
     with HasSlaveAXI4PortModuleImp
     with HasPeripheryBootROMModuleImp
     with DontTouch
