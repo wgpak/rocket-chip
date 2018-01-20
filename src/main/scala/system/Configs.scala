@@ -6,7 +6,7 @@ package freechips.rocketchip.system
 import Chisel._
 import freechips.rocketchip.config.Config
 import freechips.rocketchip.coreplex._
-import freechips.rocketchip.devices.debug.{IncludeJtagDTM, JtagDTMKey}
+import freechips.rocketchip.devices.debug._
 import freechips.rocketchip.diplomacy._
 
 class WithJtagDTMSystem extends freechips.rocketchip.coreplex.WithJtagDTM
@@ -16,6 +16,9 @@ class BaseConfig extends Config(new BaseCoreplexConfig().alter((site,here,up) =>
   case DTSModel => "freechips,rocketchip-unknown"
   case DTSCompat => Nil
   case DTSTimebase => BigInt(1000000) // 1 MHz
+  // JTAG debugging
+  case IncludeJtagDTM => true
+  case JtagDTMKey => new JtagDTMKeyDefault
   // External port parameters
   case NExtTopInterrupts => 4
   case ExtMem => MasterPortParams(
