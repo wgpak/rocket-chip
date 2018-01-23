@@ -8,6 +8,9 @@ module TestDriver;
 
   reg clock = 1'b0;
   reg reset = 1'b1;
+  integer i, fd, first, last;
+
+  reg [7:0] mem[32'h0:32'h1000000];
 
   always #(`CLOCK_PERIOD/2.0) clock = ~clock;
   initial #(`RESET_DELAY) reset = 0;
@@ -22,7 +25,27 @@ module TestDriver;
   reg [1023:0] vcdfile = 0;
   int unsigned rand_value;
   initial
-  begin
+    begin
+    // JRRK hacks
+        $readmemh("cnvmem.mem", mem);
+        for (i = 32'h80000000; (i < 32'h81000000) && (1'bx === ^mem[i-32'h80000000]); i=i+8)
+          ;
+        first = i;
+        for (i = 32'h81000000; (i >= 32'h80000000) && (1'bx === ^mem[i-32'h80000000]); i=i-8)
+          ;
+        last = (i+16);
+        for (i = i+1; i < last; i=i+1)
+          mem[i-32'h80000000] = 0;
+        $display("First = %X, Last = %X", first, last-1);
+        for (i = first; i < last; i=i+1)
+          if (1'bx === ^mem[i-32'h80000000]) mem[i-32'h80000000] = 0;
+        #1
+        for (i = first-32'h80000000; i < last-32'h80000000; i=i+8)
+          begin
+             testHarness.SimAXIMem.AXI4RAM.mem.mem_ext.ram[i/8] =
+                 {mem[i+7],mem[i+6],mem[i+5],mem[i+4],mem[i+3],mem[i+2],mem[i+1],mem[i+0]};
+          end
+    
     void'($value$plusargs("max-cycles=%d", max_cycles));
     void'($value$plusargs("dump-start=%d", dump_start));
     verbose = $test$plusargs("verbose");

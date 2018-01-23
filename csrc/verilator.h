@@ -12,7 +12,7 @@ class VerilatedVcdFILE : public VerilatedVcdFile {
  public:
   VerilatedVcdFILE(FILE* file) : file(file) {}
   ~VerilatedVcdFILE() {}
-  bool open(const string& name) override {
+  bool open(const char *name) {
     // file should already be open
     return file != NULL;
   }
