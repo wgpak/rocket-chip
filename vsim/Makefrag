@@ -53,10 +53,9 @@ VCS_OPTS = -notice -line +lint=all,noVCDE,noONGS,noUI -error=PCWM-L -timescale=1
 	+define+PRINTF_COND=$(TB).printf_cond \
 	+define+STOP_COND=!$(TB).reset \
 	+define+RANDOMIZE_MEM_INIT \
-	+define+RANDOMIZE_REG_INIT \
 	+define+RANDOMIZE_GARBAGE_ASSIGN \
 	+define+RANDOMIZE_INVALID_ASSIGN \
-	+libext+.v -y ../vsrc -gui \
+	+libext+.v -y ../vsrc -gui -R \
 
 VCS_OPTS += +vpi
 VCS_OPTS += -P $(base_dir)/vsrc/jtag_vpi.tab
