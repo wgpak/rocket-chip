@@ -6,7 +6,7 @@
 
 module TestDriver;
 
-  parameter base = 32'h80200000;
+  parameter base = 32'h80000000;
 
   reg clock = 1'b0;
   reg reset = 1'b1;
@@ -47,6 +47,8 @@ module TestDriver;
              testHarness.SimAXIMem.AXI4RAM.mem.mem_ext.ram[(i+base-32'h80000000)/8] =
                  {mem[i+7],mem[i+6],mem[i+5],mem[i+4],mem[i+3],mem[i+2],mem[i+1],mem[i+0]};
           end
+        for (i = last-base; i < 4194304-base; i=i+8)
+          testHarness.SimAXIMem.AXI4RAM.mem.mem_ext.ram[(i+base-32'h80000000)/8] = 64'b0;
     
     void'($value$plusargs("max-cycles=%d", max_cycles));
     void'($value$plusargs("dump-start=%d", dump_start));
