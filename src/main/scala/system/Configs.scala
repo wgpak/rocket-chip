@@ -20,7 +20,7 @@ class BaseConfig extends Config(new BaseSubsystemConfig().alter((site,here,up) =
   case NExtTopInterrupts => 4
   case ExtMem => MasterPortParams(
                       base = x"8000_0000",
-                      size = x"4000_0000",
+                      size = x"1000_0000",
                       beatBytes = site(MemoryBusKey).beatBytes,
                       idBits = 5)
   case ExtBus => MasterPortParams(
@@ -28,10 +28,10 @@ class BaseConfig extends Config(new BaseSubsystemConfig().alter((site,here,up) =
                       size = x"1000_0000",
                       beatBytes = site(MemoryBusKey).beatBytes,
                       idBits = 5)
-  case ExtIn  => SlavePortParams(beatBytes = 8, idBits = 8, sourceBits = 4)
+  case ExtIn  => SlavePortParams(beatBytes = 8, idBits = 5, sourceBits = 4)
 }))
 
-class DefaultConfig extends Config(new WithNBigCores(1) ++ new BaseConfig)
+class DefaultConfig extends Config(new WithJtagDTMSystem ++ new WithNBigCores(1) ++ new BaseConfig)
 
 class DefaultBufferlessConfig extends Config(
   new WithBufferlessBroadcastHub ++ new WithNBigCores(1) ++ new BaseConfig)
