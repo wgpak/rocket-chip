@@ -17,7 +17,7 @@ class BaseConfig extends Config(new BaseSubsystemConfig().alter((site,here,up) =
   case DTSCompat => Nil
   case DTSTimebase => BigInt(1000000) // 1 MHz
   // External port parameters
-  case NExtTopInterrupts => 4
+  case NExtTopInterrupts => 5
   case ExtMem => MasterPortParams(
                       base = x"8000_0000",
                       size = x"4000_0000",
